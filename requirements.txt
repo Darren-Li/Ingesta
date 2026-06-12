@@ -1,0 +1,5 @@
+streamlit
+openpyxl
+pillow
+pandera
+faker
