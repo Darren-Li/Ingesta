@@ -56,7 +56,7 @@ feature_groups = {
           "title": "数据校验",
           "icon": "🚧",
           "url": "/数据校验",
-          "description": "自定义数据文件字段校验规则，批量校验数据规范性"
+          "description": "自定义字段校验规则，批量校验数据规范性"
         }
     ],}
 

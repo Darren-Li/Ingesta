@@ -59,6 +59,6 @@
 
 ### 安装依赖
 ```bash
-git clone https://github.com/your-username/data-gen-val-tool.git
+git clone https://github.com/Darren-Li/Ingesta.git
 cd data-gen-val-tool
 pip install -r requirements.txt

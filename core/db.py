@@ -19,7 +19,7 @@ def init_db():
     """)
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS templates (
+    CREATE TABLE IF NOT EXISTS dv_templates (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         schema_json TEXT,
@@ -28,7 +28,17 @@ def init_db():
     """)
 
     c.execute("""
-    CREATE TABLE IF NOT EXISTS tasks (
+    CREATE TABLE IF NOT EXISTS dg_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        desc TEXT,
+        schema_json TEXT,
+        created_at TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS dv_tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
         template_id INTEGER,
@@ -39,12 +49,31 @@ def init_db():
     )
     """)
 
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS dg_tasks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        template_id INTEGER,
+        rows INTEGER,
+        cost DOUBLE,
+        file_name TEXT,
+        created_at TEXT
+    )
+    """)
+
     conn.commit()
     conn.close()
 
-def delete_task(task_id):
+def delete_task(table, task_id):
     conn = get_conn()
     c = conn.cursor()
-    c.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+    c.execute(f"DELETE FROM {table} WHERE id=?", (task_id,))
+    conn.commit()
+    conn.close()
+
+def delete_template(table, template_id):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute(f"DELETE FROM {table} WHERE id=?", (template_id,))
     conn.commit()
     conn.close()

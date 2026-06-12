@@ -2,7 +2,7 @@ import streamlit as st
 import json
 import ast
 from datetime import datetime
-from core.db import get_conn, delete_task
+from core.db import get_conn, delete_task, delete_template
 from core.data_validator import validate_excel
 
 
@@ -12,7 +12,7 @@ st.header("Data Validation Tool")
 if "page" not in st.session_state:
     st.session_state.page = "Validator"
 
-page = st.sidebar.radio("导航", ["Validator", "Tasks", "Templates", "Templates v2"], 
+page = st.sidebar.radio("导航", ["Validator", "Tasks", "Templates"], 
     key="dv_page")
 
 # -----------------------------
@@ -24,7 +24,7 @@ if page == "Validator":
 
     conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT id,name,schema_json FROM templates")
+    c.execute("SELECT id,name,schema_json FROM dv_templates")
     templates = c.fetchall()
     conn.close()
 
@@ -59,7 +59,7 @@ if page == "Validator":
         c = conn.cursor()
 
         c.execute("""
-            INSERT INTO tasks(user_id,template_id,status,error,file_name,created_at)
+            INSERT INTO dv_tasks(user_id,template_id,status,error,file_name,created_at)
             VALUES (?,?,?,?,?,?)
         """,(
             st.session_state.user[0],
@@ -88,7 +88,7 @@ if page == "Tasks":
         conn = get_conn()
         c = conn.cursor()
 
-        c.execute("SELECT * FROM tasks WHERE user_id=? ORDER BY created_at DESC", (st.session_state.user[0],))
+        c.execute("SELECT * FROM dv_tasks WHERE user_id=? ORDER BY created_at DESC", (st.session_state.user[0],))
         rows = c.fetchall()
         conn.close()
 
@@ -127,7 +127,7 @@ if page == "Tasks":
 
             with cols[4]:
                 if st.button("🗑️", key=f"delete_{r[0]}"):
-                    delete_task(r[0])
+                    delete_task("dv_tasks",r[0])
 
                     st.success(f"Task {r[0]} deleted")
                     st.rerun()
@@ -141,130 +141,128 @@ if page == "Templates":
 
     st.subheader("📃 Template Builder")
 
-    name = st.text_input("Template Name")
+    tab1, tab2 = st.tabs(["📃 Coding Model", "🧩 UI Model"])
 
-    schema_input = st.text_area(
-        "Schema JSON",
-        value="""{"email":{"type":"string","format":"email"},"status":{"type":"string","enum":["A","B"]}}"""
-    )
+    with tab1:
+        name = st.text_input("Template Name", key="Coding1")
 
-    if st.button("💾 Save Template"):
-        conn = get_conn()
-        c = conn.cursor()
-        c.execute(
-            "INSERT INTO templates(name,schema_json,created_at) VALUES (?,?,?)",
-            (name, schema_input, datetime.now().isoformat())
-        )
-        conn.commit()
-        conn.close()
-        st.success("Template saved")
-
-# -----------------------------
-# TEMPLATE BUILDER v2
-# -----------------------------
-if page == "Templates v2":
-
-    st.subheader("🧩 Template Builder")
-
-    name = st.text_input("Template Name")
-
-    # =========================
-    # 初始化字段列表
-    # =========================
-    if "fields" not in st.session_state:
-        st.session_state.fields = []
-
-    # =========================
-    # 添加字段按钮
-    # =========================
-    if st.button("➕ Add Field"):
-        st.session_state.fields.append({})
-
-    # =========================
-    # 字段配置 UI
-    # =========================
-    schema = {}
-
-    for i, field in enumerate(st.session_state.fields):
-
-        st.markdown(f"### Field {i+1}")
-
-        col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
-
-        # 字段名
-        field_name = col1.text_input("Field Name", key=f"name_{i}")
-
-        # 字段类型
-        field_type = col2.selectbox(
-            "Type",
-            ["string", "int", "float"],
-            key=f"type_{i}"
+        schema_input = st.text_area(
+            "Schema JSON",
+            value="""{"email":{"type":"string","format":"email"},"status":{"type":"string","enum":["A","B"]}}""",
+            key="Coding2"
         )
 
-        # 语义类型
-        semantic = col3.selectbox(
-            "Semantic",
-            ["none", "email", "person", "company", "address", "phone", "location"],
-            key=f"semantic_{i}"
-        )
+        if st.button("💾 Save Template", key="Coding3"):
+            conn = get_conn()
+            c = conn.cursor()
+            c.execute(
+                "INSERT INTO dv_templates(name,schema_json,created_at) VALUES (?,?,?)",
+                (name, schema_input, datetime.now().isoformat())
+            )
+            conn.commit()
+            conn.close()
+            st.success("Template saved")
 
-        # 是否必填
-        required = col4.checkbox("Required", key=f"req_{i}")
-
-        # 最小值
-        min_val = col5.text_input("Min", key=f"min_{i}")
-
-        # 最大值
-        max_val = col6.text_input("Max", key=f"max_{i}")
-
-        # 枚举值
-        with col7:
-            enum_input = st.text_input("Enum (comma separated)", key=f"enum_{i}")
+    with tab2:
+        name = st.text_input("Template Name", key="UI1")
 
         # =========================
-        # 组装 schema
+        # 初始化字段列表
         # =========================
-        if field_name:
+        if "fields" not in st.session_state:
+            st.session_state.fields = []
 
-            schema[field_name] = {
-                "type": field_type,
-                "nullable": not required
-            }
+        # =========================
+        # 添加字段按钮
+        # =========================
+        if st.button("➕ Add Field", key="UI2"):
+            st.session_state.fields.append({})
 
-            if semantic != "none":
-                schema[field_name]["semantic"] = semantic
+        # =========================
+        # 字段配置 UI
+        # =========================
+        schema = {}
 
-            if min_val:
-                schema[field_name]["min"] = float(min_val)
+        for i, field in enumerate(st.session_state.fields):
 
-            if max_val:
-                schema[field_name]["max"] = float(max_val)
+            st.markdown(f"### Field {i+1}")
 
-            if enum_input:
-                schema[field_name]["enum"] = [
-                    x.strip() for x in enum_input.split(",")
-                ]
+            col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
 
-    # =========================
-    # JSON 预览（非常关键）
-    # =========================
-    st.subheader("📄 Generated Schema")
-    st.json(schema)
+            # 字段名
+            field_name = col1.text_input("Field Name", key=f"name_{i}")
 
-    # =========================
-    # 保存
-    # =========================
-    if st.button("💾 Save Template"):
+            # 字段类型
+            field_type = col2.selectbox(
+                "Type",
+                ["string", "int", "float"],
+                key=f"type_{i}"
+            )
 
-        conn = get_conn()
-        c = conn.cursor()
+            # 语义类型
+            semantic = col3.selectbox(
+                "Semantic",
+                ["none", "email", "person", "company", "address", "phone", "location"],
+                key=f"semantic_{i}"
+            )
 
-        c.execute(
-            "INSERT INTO templates(name,schema_json,created_at) VALUES (?,?,?)",
-            (name, json.dumps(schema), datetime.now().isoformat())
-        )
+            # 是否必填
+            required = col4.checkbox("Required", key=f"req_{i}")
 
-        conn.commit()
-        conn.close()
+            # 最小值
+            min_val = col5.text_input("Min", key=f"min_{i}")
 
-        st.success("Template saved")
+            # 最大值
+            max_val = col6.text_input("Max", key=f"max_{i}")
+
+            # 枚举值
+            with col7:
+                enum_input = st.text_input("Enum (comma separated)", key=f"enum_{i}")
+
+            # =========================
+            # 组装 schema
+            # =========================
+            if field_name:
+
+                schema[field_name] = {
+                    "type": field_type,
+                    "nullable": not required
+                }
+
+                if semantic != "none":
+                    schema[field_name]["semantic"] = semantic
+
+                if min_val:
+                    schema[field_name]["min"] = float(min_val)
+
+                if max_val:
+                    schema[field_name]["max"] = float(max_val)
+
+                if enum_input:
+                    schema[field_name]["enum"] = [
+                        x.strip() for x in enum_input.split(",")
+                    ]
+
+        # =========================
+        # JSON 预览（非常关键）
+        # =========================
+        st.subheader("📄 Generated Schema")
+        st.json(schema)
+
+        # =========================
+        # 保存
+        # =========================
+        if st.button("💾 Save Template", key="UI3"):
+
+            conn = get_conn()
+            c = conn.cursor()
+
+            c.execute(
+                "INSERT INTO dv_templates(name,schema_json,created_at) VALUES (?,?,?)",
+                (name, json.dumps(schema), datetime.now().isoformat())
+            )
+
+            conn.commit()
+            conn.close()
+
+            st.success("Template saved")

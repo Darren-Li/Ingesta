@@ -3,6 +3,8 @@ import pandas as pd
 import json
 import os
 import time
+from datetime import datetime
+from core.db import get_conn, delete_task, delete_template
 from core.data_generator import generate_data
 
 
@@ -12,17 +14,6 @@ st.header("Data Generation Tool")
 OUTPUT_DIR = "outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 TEMPLATE_FILE = f"{OUTPUT_DIR}/saved_templates.json"
-
-# 初始化 Session State
-if 'templates' not in st.session_state:
-    if os.path.exists(TEMPLATE_FILE):
-        with open(TEMPLATE_FILE, "r", encoding="utf-8") as f:
-            st.session_state.templates = json.load(f)
-    else:
-        st.session_state.templates = {}
-
-if 'tasks' not in st.session_state:
-    st.session_state.tasks = []
 
 if 'current_config' not in st.session_state:
     # 默认给几行空配置
@@ -37,6 +28,7 @@ if 'current_config' not in st.session_state:
         "缺失率(%)": [0, 0, 0]
     })
     st.session_state.current_config = df
+    st.session_state.active_template = 0
 
 # 映射中英文类型名称，方便用户理解
 TYPE_MAPPING = {
@@ -51,9 +43,6 @@ TYPE_MAPPING = {
 REVERSE_TYPE_MAPPING = {v: k for k, v in TYPE_MAPPING.items()}
 AVAILABLE_TYPES = list(TYPE_MAPPING.values())
 
-def save_templates():
-    with open(TEMPLATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(st.session_state.templates, f, ensure_ascii=False, indent=4)
 
 # ================= 侧边栏路由 =================
 if "page" not in st.session_state:
@@ -159,15 +148,26 @@ if page == "数据生成器":
                         file_path = os.path.join(OUTPUT_DIR, f"task_{task_id}.csv")
                         df_res.to_csv(file_path, index=False, encoding="utf-8-sig")
                         
-                        st.session_state.tasks.insert(0, {
-                            "task_id": task_id,
-                            "rows": row_num,
-                            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                            "cost": cost_time,
-                            "file_path": file_path,
-                            "dataframe": df_res.head(50)
-                        })
+                        conn = get_conn()
+                        c = conn.cursor()
+
+                        c.execute("""
+                            INSERT INTO dg_tasks(user_id,template_id,rows,cost,file_name,created_at)
+                            VALUES (?,?,?,?,?,?)
+                        """,(
+                            st.session_state.user[0],
+                            st.session_state.get("active_template", 0),
+                            row_num,
+                            cost_time,
+                            file_path,
+                            datetime.now().isoformat()
+                        ))
+
+                        conn.commit()
+                        conn.close()
+
                         st.success(f"任务ID: **{task_id}** 已保存！请前往「任务管理」查看或下载。")
+
             except Exception as e:
                 st.error(f"生成失败: {str(e)}")
     
@@ -180,8 +180,18 @@ if page == "数据生成器":
             st.warning("请填写模板名称！")
         else:
             config_list = edited_df.to_dict(orient="records")
-            st.session_state.templates[template_name] = config_list
-            save_templates()
+
+            conn = get_conn()
+            c = conn.cursor()
+
+            c.execute(
+                "INSERT INTO dg_templates(name,desc,schema_json,created_at) VALUES (?,?,?,?)",
+                (template_name, template_desc, json.dumps(config_list, ensure_ascii=False), datetime.now().isoformat())
+            )
+
+            conn.commit()
+            conn.close()
+
             st.success(f"模板 '{template_name}' 保存成功！")
 
 # ================= 页面2：模板管理 =================
@@ -189,27 +199,38 @@ elif page == "模板管理":
     st.subheader("📋 模板管理")
     st.markdown("管理已保存的字段配置模板。")
 
-    if not st.session_state.templates:
-        st.info("暂无保存的模板!")
-    else:
-        for name, config in list(st.session_state.templates.items()):
-            with st.expander(f"📄 {name}"):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("SELECT id,name,desc,schema_json FROM dg_templates")
+    templates = c.fetchall()
+    conn.close()
 
+    if st.session_state.page == "模板管理" and len(templates) == 0:
+            st.warning("⚠ No templates found. Please create a template first.")
+            st.stop()
+    else:
+        for template in templates:
+            template_id = template[0]
+            name = template[1]
+            desc = template[2]
+            config = json.loads(template[3])
+
+            with st.expander(f"📄 {name}"):
+                st.caption(desc)
                 st.dataframe(pd.DataFrame(config), width='stretch', hide_index=True)
                 
                 col1, col2 = st.columns(2)
                 with col1:
                     # 💡 优化 3：点击载入后，利用独立状态锁记录，完美破除嵌套
-                    if st.button("载入", key=f"load_{name}", width='stretch'):
+                    if st.button("载入", key=f"load_{template_id}", width='stretch'):
                         st.session_state.current_config = pd.DataFrame(config)
-                        st.session_state.active_template = name # 记录当前被激活的模板名
+                        st.session_state.active_template = template_id # 记录当前被激活的模板名
                         st.rerun()
                 with col2:
-                    if st.button("删除", key=f"del_{name}", width='stretch'):
-                        if st.session_state.get("active_template") == name:
+                    if st.button("删除", key=f"del_{template_id}", width='stretch'):
+                        if st.session_state.get("active_template") == template_id:
                             st.session_state.active_template = None
-                        del st.session_state.templates[name]
-                        save_templates()
+                        delete_template("dg_templates", template_id)
                         st.rerun()
                 
                 # 💡 优化 4：跳出 columns 限制，由状态控制提示框和跳转按钮的渲染
@@ -230,29 +251,40 @@ elif page == "任务管理":
     if not loggedin_user:
         st.warning("Please login first!")
     else:
-        if not st.session_state.tasks:
-            st.info("暂无生成任务历史!")
-        else:
-            for task in st.session_state.tasks:
-                st.write(f"任务ID: **{task['task_id']}**")
-                cols = st.columns([1,2,1,1])
-                cols[0].metric("生成行数", task['rows'])
-                cols[1].metric("生成时间", task['time'])
-                cols[2].metric("耗时(秒)", task['cost'])
-                
-                with cols[3]:
-                    if os.path.exists(task['file_path']):
-                        with open(task['file_path'], "rb") as f:
-                            st.download_button(
-                                label="⬇️ 下载完整数据（CSV文件）",
-                                data=f,
-                                file_name=f"{task['task_id']}.csv",
-                                mime="text/csv",
-                                key=f"dl_{task['task_id']}"
-                            )
-                    else:
-                        st.warning("文件已清理")
+        conn = get_conn()
+        c = conn.cursor()
 
+        c.execute("SELECT * FROM dg_tasks WHERE user_id=? ORDER BY created_at DESC", (st.session_state.user[0],))
+        rows = c.fetchall()
+        conn.close()
+
+        for r in rows:
+            cols = st.columns([9,1])
+            cols[0].write(f"任务ID: **{r[0]}**")
+            if cols[1].button("🗑️", key=f"delete_{r[0]}"):
+                delete_task("dg_tasks",r[0])
+                if os.path.exists(r[5]):
+                    os.remove(r[5])
+                st.success(f"Task {r[0]} deleted")
+                st.rerun()
+
+            cols = st.columns([1,2,1,1])
+            cols[0].metric("生成行数", r[3])
+            cols[1].metric("生成时间", datetime.fromisoformat(r[6]).strftime("%Y-%m-%d %H:%M:%S"))
+            cols[2].metric("耗时(秒)", r[4])
+            if os.path.exists(r[5]):
+                with cols[3]:
+                    with open(r[5], "rb") as f:
+                        st.download_button(
+                            label="⬇️ 下载完整数据（CSV文件）",
+                            data=f,
+                            file_name=f"Ingesta_{r[0]}.csv",
+                            mime="text/csv",
+                            key=f"dl_{r[0]}"
+                        )
                 st.caption("数据预览 (Top 50 行)")
-                st.dataframe(task['dataframe'], height=200, width='stretch', hide_index=True)
+                df = pd.read_csv(r[5], nrows=50)
+                st.dataframe(df, height=200, width='stretch', hide_index=True)
                 st.divider()
+            else:
+                st.warning("文件已清理")
