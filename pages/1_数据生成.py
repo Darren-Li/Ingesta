@@ -18,14 +18,14 @@ TEMPLATE_FILE = f"{OUTPUT_DIR}/saved_templates.json"
 if 'current_config' not in st.session_state:
     # 默认给几行空配置
     df = pd.DataFrame({
-        "行号": [1, 2, 3],
-        "字段名": ["姓名", "年龄", "性别"],
-        "数据类型": ["person_name", "age", "gender"],
-        "显示格式": ["", "", ""], 
-        "最小值/起始时间": ["", "18", ""],
-        "最大值/结束时间": ["", "65", ""],
-        "自定义值列表(英文逗号分隔)": ["", "", ""],
-        "缺失率(%)": [0, 0, 0]
+        "行号": [1, 2, 3, 4],
+        "字段名": ["姓名", "注册日期", "年龄", "性别"],
+        "数据类型": ["person_name", "date_between", "age", "gender"],
+        "显示格式": ["", "", "", ""], 
+        "最小值/起始时间": ["", "-5y", "18", ""],
+        "最大值/结束时间": ["", "-1m", "65", ""],
+        "自定义值列表(英文逗号分隔)": ["", "", "", ""],
+        "缺失率(%)": [0, 0, 0, 0]
     })
     st.session_state.current_config = df
     st.session_state.active_template = 0
@@ -33,7 +33,7 @@ if 'current_config' not in st.session_state:
 # 映射中英文类型名称，方便用户理解
 TYPE_MAPPING = {
     "seq_id": "ID", "udf_sequence": "自定义值列表", 
-    "person_name": "姓名", "age": "年龄", "gender": "性别",
+    "person_name": "姓名", "age": "年龄", "gender": "性别", "user_name": "用户名", 
     "phone_number": "手机号", "email": "邮箱", 
     "number": "整数", "float_number": "浮点数", "boolean": "布尔值", 
     "date_between": "日期", "datetime_between": "时间", 
@@ -57,6 +57,7 @@ page = st.sidebar.radio(
 
 # ================= 页面1：数据生成器 =================
 if page == "数据生成器":
+
     st.subheader("✨ 数据生成器")
     st.write("通过表格快速添加所需字段，配置数据类型与约束条件。")
 
@@ -66,6 +67,7 @@ if page == "数据生成器":
         num_rows="dynamic",
         width='stretch',
         hide_index=True, # 隐藏物理索引
+        key="data_editor_key",
         column_config={
             "行号": st.column_config.NumberColumn("行号", disabled=True, width=30, format="%d"),
             "字段名": st.column_config.TextColumn("字段名 (必填)", required=True),
@@ -78,8 +80,6 @@ if page == "数据生成器":
                 step=5, width=60)
         }
     )
-
-    st.session_state.current_config = edited_df
     
     # 2. 生成与保存控制区
     row_num = st.number_input("生成行数", min_value=1, value=10, step=100)
@@ -122,7 +122,7 @@ if page == "数据生成器":
                         params["min"] = get_safe_val(row.get("最小值/起始时间"), 0.0, True)
                         params["max"] = get_safe_val(row.get("最大值/结束时间"), 100.0, True)
                         params["ndigits"] = 2
-                    elif t == ["date_between", "datetime_between"]:
+                    elif t in ["date_between", "datetime_between"]:
                         start = row.get("最小值/起始时间")
                         end = row.get("最大值/结束时间")
                         params["start_date"] = start if (not pd.isna(start) and str(start).strip()) else "-3y"
@@ -141,7 +141,7 @@ if page == "数据生成器":
                     cost_time = round(time.time() - start_time, 2)
                     
                     st.success(f"生成成功！共 {row_num} 行数据，耗时 {cost_time} 秒。")
-                    st.dataframe(df_res.head(10), hide_index=True, width='stretch')
+                    st.dataframe(df_res.head(10), hide_index=False, width='stretch')
 
                     if auto_save:
                         task_id = time.strftime("%Y%m%d_%H%M%S")
@@ -284,7 +284,7 @@ elif page == "任务管理":
                         )
                 st.caption("数据预览 (Top 50 行)")
                 df = pd.read_csv(r[5], nrows=50)
-                st.dataframe(df, height=200, width='stretch', hide_index=True)
+                st.dataframe(df, height=250, width='stretch', hide_index=False)
                 st.divider()
             else:
                 st.warning("文件已清理")

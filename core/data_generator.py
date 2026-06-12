@@ -38,6 +38,10 @@ class DataGenerator:
         v = [self.fake.name() for _ in range(self.row_num)]
         return {col_name: self.set_missing_values(v, miss_rate)}
 
+    def user_name(self, col_name="用户名", miss_rate=0, **kwargs):
+        v = [self.fake.user_name() for _ in range(self.row_num)]
+        return {col_name: self.set_missing_values(v, miss_rate)}
+
     def age(self, col_name="年龄", min=18, max=65, miss_rate=0, **kwargs):
         v = [random.randint(int(min), int(max)) for _ in range(self.row_num)]
         return {col_name: self.set_missing_values(v, miss_rate)}
@@ -88,7 +92,7 @@ class DataGenerator:
     def address(self, col_name="详细地址", miss_rate=0, **kwargs):
         v = [self.fake.address() for _ in range(self.row_num)]
         return {col_name: self.set_missing_values(v, miss_rate)}
-
+        
     def company(self, col_name="公司", miss_rate=0, **kwargs):
         v = [self.fake.company() for _ in range(self.row_num)]
         return {col_name: self.set_missing_values(v, miss_rate)}
@@ -120,6 +124,6 @@ def generate_data(row_num, fun_params):
             raise ValueError(f"不支持的生成函数: {func_name}")
             
     df = pd.DataFrame(result_dict)
-    df.insert(0, "序号", range(1, len(df) + 1))
+    # df.insert(0, "序号", range(1, len(df) + 1))
     return df
     
