@@ -1,4 +1,4 @@
-# 🚀 Data Generation & Validation Tool | 智能数据生成与校验工作台
+# Data Generation & Validation Tool | 智能数据生成与校验工作台
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-1.0.0-blue" alt="Version">
