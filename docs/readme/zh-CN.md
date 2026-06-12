@@ -6,6 +6,10 @@
   <img src="https://img.shields.io/badge/Python-3.x-yellow" alt="Python">
 </p>
 
+[![English](https://img.shields.io/badge/English-d9d9d9?style=for-the-badge)](README.md)
+[![简体中文](https://img.shields.io/badge/简体中文-d9d9d9?style=for-the-badge)](docs/readme/zh-CN.md)
+
+
 > **一站式解决测试数据痛点：从高质量模拟数据生成到严格的数据质量校验。**
 
 ## 💡 项目简介

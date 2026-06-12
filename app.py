@@ -74,8 +74,11 @@ if not st.session_state.user:
     tab1, tab2 = st.tabs(["Login", "Register"])
 
     with tab1:
-        u = st.text_input("Username", "Ingesta")
-        p = st.text_input("Password", "Ingesta", type="password")
+        # u = st.text_input("Username", "Ingesta")
+        # p = st.text_input("Password", "Ingesta", type="password")
+
+        u = st.text_input("Username", "Please enter username")
+        p = st.text_input("Password", "Please enter password", type="password")
 
         if st.button("Login"):
             user = login(u, p)
