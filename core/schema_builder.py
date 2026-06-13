@@ -24,7 +24,7 @@ def is_company(x):
     val = _safe_str(x)
     if val is None: 
         return True
-    return len(val) > 2
+    return len(val) >= 2
 
 def is_person(x):
     val = _safe_str(x)
@@ -47,7 +47,6 @@ def is_address(x):
 # -----------------------------
 # Build Pandera Schema
 # -----------------------------
-
 def build_schema(schema_json):
     columns = {}
 
@@ -63,11 +62,50 @@ def build_schema(schema_json):
         if "enum" in rule:
             checks.append(pa.Check.isin(rule["enum"]))
 
-        # RANGE
-        if "min" in rule:
-            checks.append(pa.Check.ge(rule["min"]))
-        if "max" in rule:
-            checks.append(pa.Check.le(rule["max"]))
+        if col_type == "string":
+            # STRING LENGTH
+            if "min_length" in rule:
+                checks.append(
+                    pa.Check.str_length(
+                        min_value=rule["min"]
+                    )
+                )
+            if "max_length" in rule:
+                checks.append(
+                    pa.Check.str_length(
+                        max_value=rule["max"]
+                    )
+                )
+        else: 
+            # RANGE
+            if "min" in rule:
+                checks.append(pa.Check.ge(rule["min"]))
+            if "max" in rule:
+                checks.append(pa.Check.le(rule["max"]))
+
+        # DATE RANGE
+        if "start_date" in rule:
+            checks.append(
+                pa.Check.ge(pd.Timestamp(rule["start_date"]))
+            )
+        if "end_date" in rule:
+            checks.append(
+                pa.Check.le(pd.Timestamp(rule["end_date"]))
+            )
+
+        # REGX
+        if "pattern" in rule:
+            regex = re.compile(rule["pattern"])
+
+            checks.append(
+                pa.Check(
+                    lambda x: (
+                        pd.isna(x)
+                        or bool(regex.match(str(x)))
+                    ),
+                    element_wise=True
+                )
+            )
 
         # SEMANTIC
         semantic_map = {
@@ -76,20 +114,27 @@ def build_schema(schema_json):
             "location": is_location,
             "address": is_address
         }
+        
         semantic_func = semantic_map.get(rule.get("semantic"))
+
         if semantic_func:
             checks.append(pa.Check(semantic_func, element_wise=True))
 
         dtype_map = {
             "string": pa.String,
-            "int": pa.Int,
-            "float": pa.Float
+            "int": pa.Int64,
+            "float": pa.Float,
+            "date": pa.DateTime
         }
+
+        # is_date_col = (col_type == "datetime")
 
         columns[col] = pa.Column(
             dtype_map.get(col_type, pa.String),
             checks=checks,
-            nullable=rule.get("nullable", False)
+            nullable=rule.get("nullable", False),
+            unique=rule.get("unique", False),
+            # coerce=is_date_col
         )
 
-    return pa.DataFrameSchema(columns)
+    return pa.DataFrameSchema(columns,strict=False,coerce=True)

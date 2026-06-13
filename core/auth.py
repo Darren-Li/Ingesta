@@ -1,5 +1,6 @@
 from core.db import get_conn
 
+
 def login(username, password):
     conn = get_conn()
     c = conn.cursor()

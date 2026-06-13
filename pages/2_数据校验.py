@@ -43,7 +43,6 @@ if page == "Validator":
     file = st.file_uploader("Upload Excel", type=["xlsx"])
 
     if file:
-
         success, errors = validate_excel(file, schema_json)
 
         if success:
@@ -51,9 +50,6 @@ if page == "Validator":
         else:
             st.error("Validation Failed")
             st.warning("Please check the data validation result in the module 「Tasks」 ")
-            # 登录才能查看结果哈:)
-            # for num, e in enumerate(errors):
-            #     st.error(f"🚨ERROR: {num} \n\nRow: {e['row']} | Col: '{e['column']}' | Error: {e['message']} | Error value: {e['value']} | Check rule: {e['rule']}")
 
         conn = get_conn()
         c = conn.cursor()
@@ -101,11 +97,8 @@ if page == "Tasks":
 
         st.markdown('<hr style="margin:1px 0">', unsafe_allow_html=True)  # 表头分隔线
 
-        # =========================
         # 数据行
-        # =========================
         for r in rows:
-
             cols = st.columns(col_widths)
 
             # 状态颜色
@@ -121,7 +114,7 @@ if page == "Tasks":
                 with st.expander("Details:"):
                     errors = ast.literal_eval(r[4])
                     for num, e in enumerate(errors):
-                        st.error(f"🚨ERROR: {num} \n\nRow: **{e['row']}** | Col: **{e['column']}** | Error: **{e['message']}** | Error value: **{e['value']}** | Check rule: **{e['rule']}**")
+                        st.error(f"🚨ERROR**{num}** - Row: **{e['row']}** Col: **{e['column']}**\n\n Error: **{e['message']}** | Error value: **{e['value']}** | Check rule: **{e['rule']}**")
             else:
                 st.write(None)
 
@@ -166,58 +159,62 @@ if page == "Templates":
     with tab2:
         name = st.text_input("Template Name", key="UI1")
 
-        # =========================
         # 初始化字段列表
-        # =========================
         if "fields" not in st.session_state:
             st.session_state.fields = []
 
-        # =========================
         # 添加字段按钮
-        # =========================
         if st.button("➕ Add Field", key="UI2"):
             st.session_state.fields.append({})
 
-        # =========================
         # 字段配置 UI
-        # =========================
         schema = {}
 
         for i, field in enumerate(st.session_state.fields):
 
             st.markdown(f"### Field {i+1}")
 
-            col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+            cols = st.columns([1,1,1,1,1,2,2])
 
             # 字段名
-            field_name = col1.text_input("Field Name", key=f"name_{i}")
+            field_name = cols[0].text_input("Field Name", key=f"name_{i}")
 
             # 字段类型
-            field_type = col2.selectbox(
+            field_type = cols[1].selectbox(
                 "Type",
-                ["string", "int", "float"],
+                ["string", "int", "float", "date"],
                 key=f"type_{i}"
             )
 
             # 语义类型
-            semantic = col3.selectbox(
+            semantic = cols[2].selectbox(
                 "Semantic",
                 ["none", "email", "person", "company", "address", "phone", "location"],
                 key=f"semantic_{i}"
             )
-
-            # 是否必填
-            required = col4.checkbox("Required", key=f"req_{i}")
-
-            # 最小值
-            min_val = col5.text_input("Min", key=f"min_{i}")
-
-            # 最大值
-            max_val = col6.text_input("Max", key=f"max_{i}")
+            
+            if field_type == "date":
+                # 最小日期
+                start_date = cols[3].text_input("Start Datetime", key=f"start_{i}", help="start date for Datetime")
+                # 最大日期
+                end_date = cols[4].text_input("End Datetime", key=f"end_{i}", help="end date for Datetime")
+            else:
+                # 最小值
+                min_val = cols[3].text_input("Min", key=f"min_{i}", help="min value for Int, min length for String")
+                # 最大值
+                max_val = cols[4].text_input("Max", key=f"max_{i}", help="max value for Int, max length for String")
 
             # 枚举值
-            with col7:
-                enum_input = st.text_input("Enum (comma separated)", key=f"enum_{i}")
+            enum_input = cols[5].text_input("Enum (comma separated)", key=f"enum_{i}")
+
+            # DataFrame级别校验
+            df_expression_input = cols[6].text_area("DataFrame级别校验", key=f"exp_{i}")
+
+            cols = st.columns([1,1,8])
+            # 是否必填
+            required = cols[0].checkbox("Required", key=f"req_{i}", help="required or not")
+            # 是否唯一值
+            unique = cols[1].checkbox("Unique", key=f"uni_{i}", help="unique value or not")
 
             # =========================
             # 组装 schema
@@ -226,33 +223,37 @@ if page == "Templates":
 
                 schema[field_name] = {
                     "type": field_type,
-                    "nullable": not required
+                    "nullable": not required,
+                    "unique": unique
                 }
 
                 if semantic != "none":
                     schema[field_name]["semantic"] = semantic
 
-                if min_val:
-                    schema[field_name]["min"] = float(min_val)
+                if field_type == "date":
+                    if start_date:
+                        schema[field_name]["start_date"] = start_date
 
-                if max_val:
-                    schema[field_name]["max"] = float(max_val)
+                    if end_date:
+                        schema[field_name]["end_date"] = end_date
+                else:
+                    if min_val:
+                        schema[field_name]["min"] = float(min_val)
+
+                    if max_val:
+                        schema[field_name]["max"] = float(max_val)
 
                 if enum_input:
                     schema[field_name]["enum"] = [
                         x.strip() for x in enum_input.split(",")
                     ]
 
-        # =========================
-        # JSON 预览（非常关键）
-        # =========================
+        # JSON 预览
         st.subheader("📄 Generated Schema")
         st.json(schema)
 
-        # =========================
         # 保存
-        # =========================
-        if st.button("💾 Save Template", key="UI3"):
+        if st.button("💾 Save Template", key="UI3") and name:
 
             conn = get_conn()
             c = conn.cursor()
@@ -266,3 +267,5 @@ if page == "Templates":
             conn.close()
 
             st.success("Template saved")
+        else:
+            st.warning("Please enter template name!")

@@ -56,7 +56,7 @@ feature_groups = {
           "title": "数据校验",
           "icon": "🚧",
           "url": "/数据校验",
-          "description": "自定义字段校验规则，批量校验数据规范性"
+          "description": "自定义字段级、表级校验规则，批量校验数据质量、确认数据规范性"
         }
     ],}
 
@@ -74,11 +74,11 @@ if not st.session_state.user:
     tab1, tab2 = st.tabs(["Login", "Register"])
 
     with tab1:
-        # u = st.text_input("Username", "Ingesta")
-        # p = st.text_input("Password", "Ingesta", type="password")
+        u = st.text_input("Username", "Ingesta")
+        p = st.text_input("Password", "Ingesta", type="password")
 
-        u = st.text_input("Username", "Please enter username")
-        p = st.text_input("Password", "Please enter password", type="password")
+        # u = st.text_input("Username", "Please enter username")
+        # p = st.text_input("Password", "Please enter password", type="password")
 
         if st.button("Login"):
             user = login(u, p)
@@ -101,10 +101,16 @@ if not st.session_state.user:
 else:
     st.sidebar.success(f"User: {st.session_state.user[1]}")
 
+    # Logout button
+    if st.sidebar.button("🚪 Logout", type="secondary"):
+        st.session_state.user = None
+        st.rerun()
+
     for group_name, features in feature_groups.items():
             st.markdown(f"### {group_name}")
             render_card(features, cols_per_row=3)
 
+st.divider()
 
 st.markdown(
     """
