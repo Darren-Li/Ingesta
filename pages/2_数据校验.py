@@ -253,19 +253,19 @@ if page == "Templates":
         st.json(schema)
 
         # 保存
-        if st.button("💾 Save Template", key="UI3") and name:
+        if st.button("💾 Save Template", key="UI3"):
+            if name:
+                conn = get_conn()
+                c = conn.cursor()
 
-            conn = get_conn()
-            c = conn.cursor()
+                c.execute(
+                    "INSERT INTO dv_templates(name,schema_json,created_at) VALUES (?,?,?)",
+                    (name, json.dumps(schema), datetime.now().isoformat())
+                )
 
-            c.execute(
-                "INSERT INTO dv_templates(name,schema_json,created_at) VALUES (?,?,?)",
-                (name, json.dumps(schema), datetime.now().isoformat())
-            )
+                conn.commit()
+                conn.close()
 
-            conn.commit()
-            conn.close()
-
-            st.success("Template saved")
-        else:
-            st.warning("Please enter template name!")
+                st.success("Template saved")
+            else:
+                st.warning("Please enter template name!")

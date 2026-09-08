@@ -33,10 +33,10 @@
 ### 2. 🛡️ 数据校验器 (Data Validator)
 确保入库数据的质量，防止脏数据污染下游系统。
 
-- **JSON Schema 驱动**：采用业界标准的 JSON Schema 定义校验规则，支持 String, Integer, Enum, Format (Email) 等多种类型检查。
+- **JSON Schema 驱动**：采用业界标准的 JSON Schema 定义校验规则，支持 String, Integer, Datetime, Enum, Format (Email) 等多种类型检查。
 - **Excel 批量校验**：支持拖拽上传 `.xlsx` / `.xls` 文件，系统自动根据选定模板进行全量扫描。
 - **详细的校验报告**：提供任务列表视图，清晰展示校验结果（Success/Failed）。针对失败的任务，可查看具体的错误详情，快速定位问题数据。
-- **V2 版本构建器**：内置可视化的 Template Builder，无需手写代码即可构建复杂的校验逻辑。
+- **UI界面版构建器**：内置可视化的 Template Builder，无需手写代码即可构建复杂的校验逻辑。
 
 ## 📸 界面预览
 
@@ -47,9 +47,9 @@
 | *灵活配置字段类型与约束* | *保存并复用数据结构* | *查看生成结果并下载 CSV* |
 
 ### 数据校验模块
-| 校验规则定义 | 校验任务列表 | 模板构建器 V2 |
+| 校验规则定义 | 校验任务列表 | 模板构建器 |
 | :---: | :---: | :---: |
-| ![Validator Rule](/docs/img/validator_screenshot.png) | ![Task List](/docs/img/data_validation.png) | ![Builder V2](/docs/img/builder_screenshot.png) |
+| ![Validator Rule](/docs/img/validator_screenshot.png) | ![Task List](/docs/img/data_validation.png) | ![Template Builder](/docs/img/builder_screenshot.png) |
 | *基于 JSON Schema 的规则引擎* | *清晰的 Pass/Fail 状态追踪* | *可视化构建校验逻辑* |
 
 ## 🚀 快速开始
